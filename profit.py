@@ -15,9 +15,7 @@ class Profit(object):
         self.sp500 = self.get_sp500()
         symbols = self.read_symbols()
         self.iex.refresh(symbols)
-
-    def stock(self):
-        apple = Stock("AAPL")
+        #self.iex.company_info("AAPL")
 
     def get_sp500(self):
         #grab the list of S&P 500 symbols (tickers) from Wikipedia
@@ -56,7 +54,6 @@ class Profit(object):
 
 def main():
     profit = Profit()
-    profit.stock()
 
 
 
