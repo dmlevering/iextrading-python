@@ -1,7 +1,10 @@
 import requests
+from pprint import pprint
+import pandas as pd
+
+AV_API_URL = "http://www.alphavantage.co/query?"
 
 class AlphaVantage:
-    AV_API_URL = "http://www.alphavantage.co/query?"
 
     def __init__(self, api_key=None):
         if api_key is None:
@@ -15,7 +18,24 @@ class AlphaVantage:
         if "Error Message" in json_response:
             raise ValueError(json_response["Error Message"])
         return json_response
-    
+
+    def time_series(self, symbol):
+        #set up the parameters for our API request
+        params = dict(
+            apikey = self.key,
+            function = "TIME_SERIES_INTRADAY",
+            symbol = symbol,
+            interval = "1min",
+            datatype = "json",
+            outputsize = "full"
+        )
+        response = requests.get(url=AV_API_URL, params=params)
+        data = response.json()
+        ser = pd.Series(data["Time Series (" + "1min" + ")"])
+        df = pd.DataFrame(ser)
+        #print(ser)
+        print(df)
+        #pprint(data)
 
 
 #import requests

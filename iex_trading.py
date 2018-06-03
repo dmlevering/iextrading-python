@@ -31,7 +31,6 @@ class IEXTrading:
         base = "/stock/market/batch?"
         print("Gathering market data...")
         series = []
-        count = 0
         for chunk in batches:
             #set up the parameters for our API request
             params = dict(
@@ -44,9 +43,6 @@ class IEXTrading:
                 for qk, val in v.items():
                     ser = pd.Series(val)
                     series.append(ser)
-            count += 1
-            if count == 4:
-                break
-        df = pd.concat(series, axis=1)
-        print(df.transpose())
+        df = pd.concat(series, axis=1).transpose()
+        print(df)
         print("Done!")
