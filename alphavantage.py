@@ -31,8 +31,21 @@ class AlphaVantage:
         )
         response = requests.get(url=AV_API_URL, params=params)
         data = response.json()
-        ser = pd.Series(data["Time Series (" + "1min" + ")"])
-        df = pd.DataFrame(ser)
+        json = data["Time Series (" + "1min" + ")"]
+        columns = ["Open", "High", "Low", "Close", "Volume", "Time"]
+        series = []
+        for k,v in json.items():
+            #print(k)
+            #print(v)
+            row = list(v.values())
+            row.append(k)
+            #row = list(v.values()).append(k)
+            print(row)
+            ser = pd.Series(dict(zip(columns, row)))
+            print(ser)
+            series.append(ser)
+        df = pd.concat(series, axis=1).transpose()
+        df.set_index("Time", inplace=True)
         #print(ser)
         print(df)
         #pprint(data)
