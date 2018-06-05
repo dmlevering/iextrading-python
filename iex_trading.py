@@ -45,5 +45,12 @@ class IEXTrading:
                     series.append(ser)
         df = pd.concat(series, axis=1).transpose()
         df.set_index("symbol", inplace=True)
-        print(df)
+        #print(df)
         print("Done!")
+        return df
+
+    def best_peratio(self, df):
+        print(df.dtypes)
+        df["peRatio"] = df["peRatio"].astype(float)
+        return df.nsmallest(n=50, columns="peRatio", keep="first")
+        #wtf, -1556444031219243500 for Groupon???
