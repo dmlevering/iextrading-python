@@ -1,6 +1,7 @@
 import requests
 from pprint import pprint
 import pandas as pd
+import matplotlib.pyplot as plt
 
 AV_API_URL = "http://www.alphavantage.co/query?"
 

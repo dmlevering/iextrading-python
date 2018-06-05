@@ -44,5 +44,6 @@ class IEXTrading:
                     ser = pd.Series(val)
                     series.append(ser)
         df = pd.concat(series, axis=1).transpose()
+        df.set_index("symbol", inplace=True)
         print(df)
         print("Done!")
