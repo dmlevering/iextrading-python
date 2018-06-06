@@ -1,12 +1,12 @@
 import requests
 from pprint import pprint
 from utils import Utils
-from stock import Stock
 import numpy as np
 import pandas as pd
-import datetime
+from datetime import datetime, timedelta
 import sys
 import csv
+from bs4 import BeautifulSoup
 
 class IEXTrading(object):
     #paths and filenames
@@ -22,15 +22,15 @@ class IEXTrading(object):
     API_URL_IEX = "https://api.iextrading.com/1.0"
     BATCH_LIMIT_IEX = 100
     MAX_DATA_AGE_MINUTES = 5
-    DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S\n"
-
+    DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     def __init__(self):
-        self.symbols = self.read_symbols()
-        self.market_data = self.read_market_data()
-        pass
+        self.symbols = self._read_symbols()
+        self.market_data = self._read_market_data()
+        self.sp500 = self.get_sp500()
+        print(self.best_peratio())
 
-    def read_symbols(self):
+    def _read_symbols(self):
         symbols = set()
         with open(self.PATH_SYMBOLS + self.FILENAME_NASDAQ, "r") as f:
             reader = csv.reader(f, delimiter=',')
@@ -46,10 +46,8 @@ class IEXTrading(object):
                 symbols.add(row[0])
         return sorted(list(symbols))
 
-    def api_call(self, params):
-        response = requests.get(url=self.API_URL_IEX, params=params)
-        json_response = response.json()
-        return json_response
+    def cache_refresh(self):
+        self.market_data = _api_request_market_data()
 
     def company_info(self, symbol):
         http_req = "/stock/" + symbol + "/company"
@@ -59,26 +57,27 @@ class IEXTrading(object):
         pprint(json)
         print(df)
 
-    def save_market_data(self, df):
+    def _save_market_data(self, df):
         try:
             df.to_csv(self.PATH_CACHE + self.FILENAME_MARKET_DATA)
             with open(self.PATH_CACHE + self.FILENAME_METADATA, "w+") as f_meta:
-                f_meta.write(datetime.datetime.now().strftime(self.DATETIME_FORMAT))
+                f_meta.write(datetime.now().strftime(self.DATETIME_FORMAT) + "\n")
                 f_meta.write("Data collected from IEX Trading API\n")
                 f_meta.write("Do not change this file!\n")
+            print("Market data successfully saved to " + PATH_CACHE + FILENAME_MARKET_DATA)
         except OSError as err:
             print("OSError: {0}".format(err))
             raise
 
-    def read_market_data(self):
+    def _read_market_data(self):
         #determine if cached data is still fresh
         try:
             with open(self.PATH_CACHE + self.FILENAME_METADATA, "r") as f_meta:
-                #MAX_DATA_AGE_MINUTES minutes ago
-                max_age = datetime.datetime.now() - (datetime.datetime.now() -
-                            datetime.timedelta(minutes=self.MAX_DATA_AGE_MINUTES))
-                data_age = (datetime.datetime.now() -
-                            datetime.datetime.strptime(f_meta.readline(), self.DATETIME_FORMAT))
+                #max_age = MAX_DATA_AGE_MINUTES minutes ago
+                max_age = datetime.now() - (datetime.now() -
+                            timedelta(minutes=self.MAX_DATA_AGE_MINUTES))
+                data_age = (datetime.now() -
+                            datetime.strptime(f_meta.readline().rstrip('\n'), self.DATETIME_FORMAT))
                 if data_age > max_age:
                     #stale data...
                     print("Stale data; requesting market data through API...")
@@ -88,37 +87,45 @@ class IEXTrading(object):
                     print("Fresh data; reading cached market data...")
                     return pd.read_csv(self.PATH_CACHE + self.FILENAME_MARKET_DATA)
         except OSError as err:
-            print("OSError: {0}".format(err))
+            #it's likely that the metadata file hasn't been created yet
+            print("Caught OSError: {0}".format(err))
             print("Requesting market data through API...")
             return self._api_request_market_data()
 
-
-
     def _api_request_market_data(self):
-        batches = list(Utils.chunks(self.symbols, 100))
-        base = "/stock/market/batch?"
-        series = []
-        for chunk in batches:
+        symbol_batches = list(Utils.chunks(self.symbols, self.BATCH_LIMIT_IEX))
+        request_base = "/stock/market/batch?"
+        series_list = []
+        for batch in symbol_batches:
             #set up the parameters for our API request
             params = dict(
-                symbols = ','.join(chunk),
-                types = "quote" #price,ohlc,stats,
+                symbols = ','.join(batch),
+                types = "quote"
             )
-            response = requests.get(url=self.API_URL_IEX + base, params=params)
-            json = response.json()
-            for k,v in json.items():
+            response = requests.get(url=self.API_URL_IEX + request_base, params=params)
+            for k,v in response.json().items():
                 for qk, val in v.items():
                     ser = pd.Series(val)
-                    series.append(ser)
-        df = pd.concat(series, axis=1).transpose()
+                    series_list.append(ser)
+        df = pd.concat(series_list, axis=1).transpose()
         df.set_index("symbol", inplace=True)
-        #print(df)
         print("Done!")
-        self.save_market_data(df)
+        self._save_market_data(df)
         return df
 
-    def best_peratio(self, df):
-        print(df.dtypes)
-        df["peRatio"] = df["peRatio"].astype(float)
-        return df.nsmallest(n=50, columns="peRatio", keep="first")[["companyName", "latestPrice", "latestTime", "latestSource"]]
+    def get_sp500(self):
+        #grab a list of the current S&P 500 symbols (tickers) from Wikipedia
+        response = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+        soup = BeautifulSoup(response.text, 'lxml')
+        table = soup.find('table', {'class': 'wikitable sortable'})
+        symbols = []
+        for row in table.findAll('tr')[1:]:
+            symbol = row.findAll('td')[0].text
+            symbols.append(symbol)
+        return sorted(symbols)
+
+    def best_peratio(self):
+        #TODO: don't change the data
+        self.market_data["peRatio"] = self.market_data["peRatio"].astype(float)
+        return self.market_data.nsmallest(n=50, columns="peRatio", keep="first")[["companyName", "latestPrice", "latestTime", "latestSource"]]
         #wtf, -1556444031219243500 for Groupon???
