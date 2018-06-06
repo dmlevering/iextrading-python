@@ -13,9 +13,9 @@ class Profit(object):
         self.av = AlphaVantage(AV_API_KEY)
         self.iex = IEXTrading()
         self.sp500 = self.get_sp500()
-        symbols = self.read_symbols()
-        df = self.iex.refresh(symbols)
-        print(self.iex.best_peratio(df))
+        #symbols = self.read_symbols()
+        #df = self.iex.refresh(symbols)
+        #print(self.iex.best_peratio(df))
         #self.iex.company_info("AAPL")
         #self.av.time_series("AAPL")
 
@@ -30,21 +30,7 @@ class Profit(object):
             symbols.append(symbol)
         return sorted(symbols)
 
-    def read_symbols(self):
-        symbols = set()
-        with open("symbols/nasdaq.csv") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        with open("symbols/nyse.csv") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        with open("symbols/amex.csv") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        return sorted(list(symbols))
+
 
     def get_nasdaq(self):
         with open("symbols/NASDAQ.csv") as f:

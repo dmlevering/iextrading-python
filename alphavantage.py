@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 AV_API_URL = "http://www.alphavantage.co/query?"
 
 class AlphaVantage:
+    #turns out AlphaVantage uses IEX as the data supplier
 
     def __init__(self, api_key=None):
         if api_key is None:

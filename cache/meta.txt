@@ -1,0 +1,2 @@
+2018-06-05 21:58:47
+Data collected from IEX Trading API
