@@ -43,10 +43,27 @@ class IEXTrading(object):
         self.market_data = self._read_market_data()
         self.sp500 = self.get_sp500()
         print(self.best_peratio())
-        df_apple_ts = self._api_request_time_series("AAPL", "2y")
-        df_apple_ts["date"] =  pd.to_datetime(df_apple_ts["date"])
-        df_apple_ts.plot(x="date", y="close")
+        symbols = ["AAPL","MSFT", "GOOG", "AMZN"]
+        dfs = self._api_request_time_series(symbols, "2y")
+        #for df in dfs:
+        #    df["date"] = pd.to_datetime(df["date"])
+        #    df.plot(x="date", y="close")
+        #df_apple_ts["date"] =  pd.to_datetime(df_apple_ts["date"])
+        #df_apple_ts.plot(x="date", y="close")
+        #plt.show()
+
+        fig, ax = plt.subplots()
+        for i, df in enumerate(dfs):
+            df["date"] = pd.to_datetime(df["date"])
+            df.plot(ax=ax, x="date", y="close", label=symbols[i])
+
+        plt.ylabel("Share price (dollars)")
+        plt.xlabel("Date")
+        plt.title("Share Price over Time")
         plt.show()
+
+        #stats
+        df = self.stats(symbols)
 
     def _read_symbols(self):
         symbols = set()
@@ -110,14 +127,15 @@ class IEXTrading(object):
 
             return self._api_request_market_data()
 
-    def _api_request_time_series(self, symbol, range):
-        request_base = "/stock/" + symbol + "/chart/" + range
-        response = requests.get(url=self.API_URL_IEX + request_base)
-        series_list = [pd.Series(day) for day in response.json()]
-        df = pd.concat(series_list, axis=1).transpose()
-        #df.set_index("date", inplace=True)
-        print(df)
-        return df
+    def _api_request_time_series(self, symbols, range):
+        dfs = []
+        for symbol in symbols:
+            request_base = "/stock/" + symbol + "/chart/" + range
+            response = requests.get(url=self.API_URL_IEX + request_base)
+            series_list = [pd.Series(day) for day in response.json()]
+            df = pd.concat(series_list, axis=1).transpose()
+            dfs.append(df)
+        return dfs
 
     def _api_request_market_data(self):
         symbol_batches = list(Utils.chunks(self.symbols, self.BATCH_LIMIT_IEX))
@@ -159,3 +177,29 @@ class IEXTrading(object):
         print(self.market_data)
         return self.market_data.nsmallest(n=50, columns="peRatio", keep="first")[["companyName", "latestPrice", "latestTime", "latestSource"]]
         #wtf, -1556444031219243500 for Groupon???
+
+    def nasdaq_dozen(self):
+        pass
+        #1: Is revenue increasing?
+        #2: Is EPS (Earnings Per Share) increasing?
+        #3: Is ROE (Return On Equity) increasing for 2 years?
+        #4: Analyst recommendations
+        #5: PEG ratio
+        #6: Is the company earning more than the industry average?
+        #7: Is Days to Cover less than 2?
+        #8: Is the net activity positive (more buyers than sellers) over the last 3 months?
+
+    def plot(dfs, xcol, ycol):
+        pass
+
+    def stats(self, symbols):
+        series_list = []
+        for symbol in symbols:
+            request_base = "/stock/" + symbol + "/stats"
+            response = requests.get(url=self.API_URL_IEX + request_base)
+            data = response.json()
+            data.update({"symbol":symbol})
+            series_list.append(pd.Series(data))
+        df = pd.concat(series_list, axis=1).transpose()
+        print(df)
+        return df
