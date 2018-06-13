@@ -64,22 +64,54 @@ class IEXTrading(object):
     BATCH_LIMIT_IEX = 100
     MAX_MARKET_DATA_AGE_MINUTES = 120
     DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-    MARKET_DATA_TYPES = [DataType.QUOTE.value,
-                         DataType.EARNINGS.value,
-                         DataType.FINANCIALS.value,
-                         DataType.KEY_STATS.value,
-                         DataType.COMPANY.value
+
+    # JSON data parsing methods
+    def _parse_quote(symbol, data):
+        #pprint(data)
+        quote = data[IEXTrading.DataType.QUOTE.value]
+        #pprint(quote)
+        series = pd.Series(quote)
+        #print(series)
+        print("quote")
+        return series
+
+    def _parse_earnings(symbol, data):
+        print("earnings")
+        earnings = data[IEXTrading.DataType.EARNINGS.value]
+        print(earnings)
+        series = pd.Series(earnings)
+        print(series)
+        return series
+
+    def _parse_financials(symbol, data):
+        print("financials")
+        pass
+
+    def _parse_stats(symbol, data):
+        print("stats")
+        pass
+
+    #@staticmethod
+    def _parse_company(symbol, data):
+        print("company")
+        pass
+
+    MARKET_DATA_TYPES = [(DataType.QUOTE.value, _parse_quote),
+                         (DataType.EARNINGS.value, _parse_earnings),
+                         (DataType.FINANCIALS.value, _parse_financials),
+                         (DataType.KEY_STATS.value, _parse_stats),
+                         (DataType.COMPANY.value, _parse_company),
                         ]
 
     def __init__(self):
         self.symbols = self._read_symbols()
         self.market_data = self._read_market_data()
-        self.sp500 = self.get_sp500()
+        #self.sp500 = self.get_sp500()
         #print(self.best_peratio())
 
 
         #stats
-        df = self.stats(symbols)
+        #df = self.stats(symbols)
 
     def _read_symbols(self):
         symbols = set()
@@ -164,12 +196,15 @@ class IEXTrading(object):
             #set up the parameters for API request
             params = dict(
                 symbols = ','.join(batch),
-                types = ",".join(self.MARKET_DATA_TYPES)
+                types = ",".join([i[0] for i in self.MARKET_DATA_TYPES])
             )
             response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
             #results = {data_type : response_json[data_type] for data_type in self.MARKET_DATA_TYPES}
+            #call each parsing function
+            pprint(response_json.items())
             for symbol, data in response_json.items():
-                self._parse_quote(data)
+                for i in range(len(self.MARKET_DATA_TYPES)):
+                    series_list.append(self.MARKET_DATA_TYPES[i][1](symbol, data))
 
             break
 
@@ -183,13 +218,8 @@ class IEXTrading(object):
         #self._save_market_data(df)
         #return df
 
-    def _parse_quote(self, data):
-        pprint(data)
-        quote = data[self.DataType.QUOTE.value]
-        if quote is None:
-            print("wtf")
-            return None
-        pprint(quote)
+
+
 
 
     def get_sp500(self):
