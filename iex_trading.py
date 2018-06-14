@@ -9,6 +9,7 @@ import sys
 import csv
 from bs4 import BeautifulSoup
 from enum import Enum
+from pandas.io.json import json_normalize
 
 class IEXTrading(object):
     #paths and filenames
@@ -77,21 +78,39 @@ class IEXTrading(object):
 
     def _parse_earnings(symbol, data):
         print("earnings")
-        earnings = data[IEXTrading.DataType.EARNINGS.value]
+        intermediate = data[IEXTrading.DataType.EARNINGS.value]
+        if not intermediate:
+            return None
+        earnings = intermediate[IEXTrading.DataType.EARNINGS.value]
+        #for quarter in earnings:
+            #quarter.update({"symbol":symbol})
         print(earnings)
-        series = pd.Series(earnings)
-        print(series)
-        return series
+        df = pd.DataFrame(earnings)
+        print(df)
+        df["symbol"] = symbol
+        df.set_index("symbol", append=True, inplace=True)
+        #series.set_index(["symbol"], inplace=True)
+        print(df)
+        return df
+        #TODO: concat all of these dataframes somewhere
 
     def _parse_financials(symbol, data):
         print("financials")
-        pass
+        intermediate = data[IEXTrading.DataType.FINANCIALS.value]
+        if not intermediate:
+            return None
+        financials = intermediate[IEXTrading.DataType.FINANCIALS.value]
+        #print(intermediate)
+        pprint(financials)
+        series = pd.DataFrame(financials)
+
+        print(series)
+        return series
 
     def _parse_stats(symbol, data):
         print("stats")
         pass
 
-    #@staticmethod
     def _parse_company(symbol, data):
         print("company")
         pass
@@ -201,7 +220,7 @@ class IEXTrading(object):
             response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
             #results = {data_type : response_json[data_type] for data_type in self.MARKET_DATA_TYPES}
             #call each parsing function
-            pprint(response_json.items())
+            #pprint(response_json.items())
             for symbol, data in response_json.items():
                 for i in range(len(self.MARKET_DATA_TYPES)):
                     series_list.append(self.MARKET_DATA_TYPES[i][1](symbol, data))
@@ -215,7 +234,7 @@ class IEXTrading(object):
         #df = pd.concat(series_list, axis=1).transpose()
         #df.set_index("symbol", inplace=True)
         #print("Done!")
-        #self._save_market_data(df)
+
         #return df
 
 
