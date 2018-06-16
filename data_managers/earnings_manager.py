@@ -5,6 +5,9 @@ class EarningsManager(object):
         self.df = None
         self.intermediate_list = []
 
+    def get_df(self):
+        return self.df
+
     def create_df(self):
         self.df = pd.concat(self.intermediate_list)
         print(self.df)

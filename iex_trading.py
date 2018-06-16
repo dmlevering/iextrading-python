@@ -11,22 +11,12 @@ from bs4 import BeautifulSoup
 from constants import Constants
 from pandas.io.json import json_normalize
 from data_managers.earnings_manager import EarningsManager
+from cache.cache import Cache
 
 class IEXTrading(object):
-    #paths and filenames
-    PATH_CACHE           = "cache/"
-    PATH_SYMBOLS         = "symbols/"
-    FILENAME_METADATA    = "meta.txt"
-    FILENAME_MARKET_DATA = "market_data.csv"
-    FILENAME_NASDAQ      = "nasdaq.csv"
-    FILENAME_NYSE        = "nyse.csv"
-    FILENAME_AMEX        = "amex.csv"
-
     #constants
     API_URL_IEX = "https://api.iextrading.com/1.0"
     BATCH_LIMIT_IEX = 100
-    MAX_MARKET_DATA_AGE_MINUTES = 120
-    DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     # JSON data parsing methods
     def _parse_quote(symbol, data):
@@ -90,6 +80,7 @@ class IEXTrading(object):
                         ]
 
     def __init__(self):
+        self.cache = Cache()
         self.earnings_manager = EarningsManager()
 
 
@@ -102,17 +93,22 @@ class IEXTrading(object):
         #stats
         #df = self.stats(symbols)
 
+    def _read_market_data(self):
+        earnings = self.cache.read(Constants.DataType.EARNINGS)
+        if earnings is None:
+            self._api_request_market_data()
+
     def _read_symbols(self):
         symbols = set()
-        with open(self.PATH_SYMBOLS + self.FILENAME_NASDAQ, "r") as f:
+        with open(Constants.PATH_SYMBOLS + Constants.FILENAME_NASDAQ, "r") as f:
             reader = csv.reader(f, delimiter=',')
             for row in reader:
                 symbols.add(row[0])
-        with open(self.PATH_SYMBOLS + self.FILENAME_NYSE, "r") as f:
+        with open(Constants.PATH_SYMBOLS + Constants.FILENAME_NYSE, "r") as f:
             reader = csv.reader(f, delimiter=',')
             for row in reader:
                 symbols.add(row[0])
-        with open(self.PATH_SYMBOLS + self.FILENAME_AMEX, "r") as f:
+        with open(Constants.PATH_SYMBOLS + Constants.FILENAME_AMEX, "r") as f:
             reader = csv.reader(f, delimiter=',')
             for row in reader:
                 symbols.add(row[0])
@@ -128,41 +124,6 @@ class IEXTrading(object):
         df = json_normalize(json)
         pprint(json)
         print(df)
-
-    def _save_market_data(self, df):
-        try:
-            df.to_csv(self.PATH_CACHE + self.FILENAME_MARKET_DATA)
-            with open(self.PATH_CACHE + self.FILENAME_METADATA, "w+") as f_meta:
-                f_meta.write(datetime.now().strftime(self.DATETIME_FORMAT) + "\n")
-                f_meta.write("Data collected from IEX Trading API\n")
-                f_meta.write("Do not change this file!\n")
-            print("Market data successfully saved to " + self.PATH_CACHE + self.FILENAME_MARKET_DATA)
-        except OSError as err:
-            print("OSError: {0}".format(err))
-            raise
-
-    def _read_market_data(self):
-        #determine if cached data is still fresh
-        try:
-            with open(self.PATH_CACHE + self.FILENAME_METADATA, "r") as f_meta:
-                #max_age = MAX_DATA_AGE_MINUTES minutes ago
-                max_age = datetime.now() - (datetime.now() -
-                            timedelta(minutes=self.MAX_MARKET_DATA_AGE_MINUTES))
-                data_age = (datetime.now() -
-                            datetime.strptime(f_meta.readline().rstrip('\n'), self.DATETIME_FORMAT))
-                if data_age > max_age:
-                    #stale data...
-                    print("Stale data...")
-                    return self._api_request_market_data()
-                else:
-                    #fresh data!
-                    print("Fresh data...\nReading cached market data...")
-                    return pd.read_csv(self.PATH_CACHE + self.FILENAME_MARKET_DATA)
-        except OSError as err:
-            #it's likely that the metadata file hasn't been created yet
-            print("Caught OSError: {0}".format(err))
-
-            return self._api_request_market_data()
 
     def _api_request_time_series(self, symbols, range):
         dfs = []

@@ -1,6 +1,15 @@
 from enum import Enum
 
 class Constants(object):
+    #paths and filenames
+
+    PATH_SYMBOLS         = "symbols/"
+    FILENAME_EARNINGS    = "earnings.csv"
+    FILENAME_MARKET_DATA = "market_data.csv"
+    FILENAME_NASDAQ      = "nasdaq.csv"
+    FILENAME_NYSE        = "nyse.csv"
+    FILENAME_AMEX        = "amex.csv"
+
     class DataType(Enum):
         BATCH            = "batch"
         BOOK             = "book"
