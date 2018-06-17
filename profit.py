@@ -10,8 +10,7 @@ AV_API_KEY = "7NMFQZSBM2Y5BJV6"
 
 class Profit(object):
     def __init__(self):
-        self.cache = Cache()
-        self.data_manager = DataManager(self.cache)
+        self.data_manager = DataManager()
         self.data_manager.data_refresh()
 
         #self.av = AlphaVantage(AV_API_KEY)
