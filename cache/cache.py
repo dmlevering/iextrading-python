@@ -3,52 +3,68 @@ from constants import Constants
 
 class Cache(object):
     MAX_DATA_AGE = 120
+    PATH_CACHE = "cache/"
     FILENAME_METADATA = "meta.data"
 
     def __init__(self):
         pass
 
-    def write(self, datatype, df):
-        #save data
-        path_data = self.get_path(datatype)
-        df.to_csv(path_data)
+    def write(self, lock, datatype, df):
+        lock.acquire()
+        try:
+            #save data
+            path_data = self._get_path(datatype)
+            df.to_csv(path_data)
 
-        #attempt to load existing metadata
-        metadata = self._metadata_read()
-        if metadata is None:
-            metadata = Meta()
+            #attempt to load existing metadata
+            metadata = self._metadata_read()
+            if metadata is None:
+                metadata = Meta()
 
-        #save metadata
-        self._metadata_write(metadata, datatype)
+            #save metadata
+            self._metadata_write(metadata, datatype)
+        finally:
+            lock.release()
 
-    def read(self, datatype):
-        #determine paths
-        path_meta = self.FILENAME_METADATA
+    def read(self, lock, datatype):
+        lock.acquire()
+        try:
+            #return value
+            ret = None
 
-        #attempt to load existing metadata
-        metadata = self._metadata_read()
-        if metadata is None:
-            return None
+            #determine paths
+            path_meta = self.PATH_CACHE + self.FILENAME_METADATA
 
-        #is data fresh?
-        max_age = datetime.now() - (datetime.now() - timedelta(minutes=self.MAX_DATA_AGE))
-        data_age = datetime.now() - metadata.get_datetime(datatype)
-        if data_age > max_age:
-            #stale data...
-            print("Stale data...")
-            return None
-        else:
-            #fresh data!
-            print("Fresh data...\nReading cached " + datatype.value + " data...")
-            return pd.read_csv(path_meta)
+            #attempt to load existing metadata
+            metadata = self._metadata_read()
+            if metadata is None:
+                raise Exception("No metadata file exists!")
+
+            #is data fresh?
+            max_age = datetime.now() - (datetime.now() - timedelta(minutes=self.MAX_DATA_AGE))
+            data_age = datetime.now() - metadata.get_datetime(datatype)
+            if data_age > max_age:
+                #stale data...
+                raise Exception("Stale data...")
+            else:
+                #fresh data!
+                print("Fresh data...\nReading cached " + datatype.value + " data...")
+                ret = pd.read_csv(path_meta)
+        except Exception as e:
+            print(e.args)
+            ret = None
+        finally:
+            lock.release()
+            return ret
 
     def _metadata_read(self):
+        #should already hold the lock
         #determine paths
-        path_meta = self.FILENAME_METADATA
+        path_meta = self.PATH_CACHE + self.FILENAME_METADATA
 
         #attempt to load existing metadata
         try:
-            with open(self.FILENAME_METADATA, 'rb') as f_meta:
+            with open(path_meta, 'rb') as f_meta:
                 return pickle.load(f_meta)
         except OSError as err:
             #it's likely that the metadata file hasn't been created yet
@@ -56,9 +72,16 @@ class Cache(object):
             return None
 
     def _metadata_write(self, metadata, datatype):
+        #should already hold the lock
+        #determine paths
+        path_meta = self.PATH_CACHE + self.FILENAME_METADATA
+
         metadata.set_datetime(datatype)
         with open(path_meta, 'wb+') as f:
             pickle.dump(metadata, f, pickle.HIGHEST_PROTOCOL)
+
+    def _get_path(self, datatype):
+        return self.PATH_CACHE + datatype + ".csv"
 
 class Meta(object):
     def __init__(self):

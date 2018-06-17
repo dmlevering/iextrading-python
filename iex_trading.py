@@ -8,10 +8,9 @@ from datetime import datetime, timedelta
 import sys
 import csv
 from bs4 import BeautifulSoup
-from constants import Constants
 from pandas.io.json import json_normalize
-from data_managers.earnings_manager import EarningsManager
 from cache.cache import Cache
+from data.data_manager import DataManager
 
 class IEXTrading(object):
     #constants
@@ -21,7 +20,7 @@ class IEXTrading(object):
     # JSON data parsing methods
     def _parse_quote(symbol, data):
         #pprint(data)
-        quote = data[Constants.DataType.QUOTE.value]
+        quote = data[cdt.QUOTE.value]
         #pprint(quote)
         series = pd.Series(quote)
         #print(series)
@@ -29,34 +28,14 @@ class IEXTrading(object):
         return series
 
     def _parse_earnings(symbol, data):
-        print("earnings")
-        intermediate = data[Constants.DataType.EARNINGS.value]
-        if not intermediate:
-            return None
-        earnings = intermediate[Constants.DataType.EARNINGS.value]
-
-        # Index Levels
-        indices = [(symbol, "-"+str(i+1)+"q") for i in range(len(earnings))]
-        hier_index = pd.MultiIndex.from_tuples(indices)
-        #for quarter in earnings:
-            #quarter.update({"symbol":symbol})
-        #pprint(earnings)
-        #print(hier_index)
-        df = pd.DataFrame(earnings, hier_index)
-        #print(df)
-        #df["symbol"] = symbol
-        #df.set_index("symbol", append=True, inplace=True)
-        #series.set_index(["symbol"], inplace=True)
-        print(df)
-        return df
-        #TODO: concat all of these dataframes somewhere
+        pass
 
     def _parse_financials(symbol, data):
         print("financials")
-        intermediate = data[Constants.DataType.FINANCIALS.value]
+        intermediate = data[cdt.FINANCIALS.value]
         if not intermediate:
             return None
-        financials = intermediate[Constants.DataType.FINANCIALS.value]
+        financials = intermediate[cdt.FINANCIALS.value]
         #print(intermediate)
         #pprint(financials)
         series = pd.DataFrame(financials)
@@ -64,61 +43,28 @@ class IEXTrading(object):
         #print(series)
         return series
 
-    def _parse_stats(symbol, data):
-        print("stats")
-        pass
-
-    def _parse_company(symbol, data):
-        print("company")
-        pass
-
-    MARKET_DATA_TYPES = [(Constants.DataType.QUOTE.value, _parse_quote),
-                         (Constants.DataType.EARNINGS.value, _parse_earnings),
-                         (Constants.DataType.FINANCIALS.value, _parse_financials),
-                         (Constants.DataType.KEY_STATS.value, _parse_stats),
-                         (Constants.DataType.COMPANY.value, _parse_company),
+    MARKET_DATA_TYPES = [(cdt.QUOTE.value, _parse_quote),
+                         (cdt.EARNINGS.value, _parse_earnings),
+                         (cdt.FINANCIALS.value, _parse_financials),
+                         (cdt.KEY_STATS.value, _parse_stats),
+                         (cdt.COMPANY.value, _parse_company),
                         ]
 
     def __init__(self):
         self.cache = Cache()
-        self.earnings_manager = EarningsManager()
-
-
-        self.symbols = self._read_symbols()
+        self.data_manager = DataManager(self.cache)
         self.market_data = self._read_market_data()
-        #self.sp500 = self.get_sp500()
-        #print(self.best_peratio())
-
-
-        #stats
-        #df = self.stats(symbols)
 
     def _read_market_data(self):
-        earnings = self.cache.read(Constants.DataType.EARNINGS)
+        earnings = self.cache.read(cdt.EARNINGS)
         if earnings is None:
             self._api_request_market_data()
-
-    def _read_symbols(self):
-        symbols = set()
-        with open(Constants.PATH_SYMBOLS + Constants.FILENAME_NASDAQ, "r") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        with open(Constants.PATH_SYMBOLS + Constants.FILENAME_NYSE, "r") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        with open(Constants.PATH_SYMBOLS + Constants.FILENAME_AMEX, "r") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        return sorted(list(symbols))
 
     def cache_refresh(self):
         self.market_data = _api_request_market_data()
 
     def company_info(self, symbol):
-        http_req = "/" + Constants.DataType.STOCK.value + "/" + symbol + "/" + Constants.DataType.COMPANY.value
+        http_req = "/" + cdt.STOCK.value + "/" + symbol + "/" + cdt.COMPANY.value
         response = requests.get(self.API_URL_IEX + http_req)
         json = response.json()
         df = json_normalize(json)
@@ -128,8 +74,8 @@ class IEXTrading(object):
     def _api_request_time_series(self, symbols, range):
         dfs = []
         for symbol in symbols:
-            request_base = ("/" + Constants.DataType.STOCK.value + "/" + symbol + "/" +
-                            Constants.DataType.CHART.value + "/" + range)
+            request_base = ("/" + cdt.STOCK.value + "/" + symbol + "/" +
+                            cdt.CHART.value + "/" + range)
             response = requests.get(url=self.API_URL_IEX + request_base)
             series_list = [pd.Series(day) for day in response.json()]
             df = pd.concat(series_list, axis=1).transpose()
@@ -138,39 +84,20 @@ class IEXTrading(object):
 
     def _api_request_market_data(self):
         symbol_batches = list(Utils.chunks(self.symbols, self.BATCH_LIMIT_IEX))
-        request_base = ("/" + Constants.DataType.STOCK.value + "/" + Constants.DataType.MARKET.value + "/" +
-                        Constants.DataType.BATCH.value + "?")
-        series_list = []
+        request_base = ("/" + cdt.STOCK.value + "/" + cdt.MARKET.value + "/" +
+                        cdt.BATCH.value + "?")
         print("Requesting market data through API...")
-        json_collection = {}
-        types = ",".join([i[0] for i in self.MARKET_DATA_TYPES])
-        print(types)
+        datatypes = ",".join([i[0] for i in self.MARKET_DATA_TYPES])
         for batch in symbol_batches:
             #set up the parameters for API request
             params = dict(
                 symbols = ','.join(batch),
-                types = types
+                types = datatypes
             )
-            response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
             #this JSON object will make a fine addition to my collection
-            #json_collection = {**json_collection, **response_json}
-
-            #results = {data_type : response_json[data_type] for data_type in self.MARKET_DATA_TYPES}
-            #call each parsing function
-            #pprint(response_json.items())
+            response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
             for symbol, data in response_json.items():
                 self.earnings_manager.add_symbol(symbol, data)
-            #    for i in range(len(self.MARKET_DATA_TYPES)):
-            #        series_list.append(self.MARKET_DATA_TYPES[i][1](symbol, data))
-
-            #for k,v in response.json().items():
-                #for qk, val in v.items():
-                    #ser = pd.Series(val)
-                    #series_list.append(ser)
-        #df = pd.concat(series_list, axis=1).transpose()
-        #df.set_index("symbol", inplace=True)
-        #print("Done!")
-        #pprint(json_collection)
         self.earnings_manager.create_df()
 
         #return df
@@ -189,14 +116,6 @@ class IEXTrading(object):
             symbol = row.findAll('td')[0].text
             symbols.append(symbol)
         return sorted(symbols)
-
-    def best_peratio(self):
-        #TODO: don't change the data
-        print(self.market_data)
-        self.market_data["peRatio"] = self.market_data["peRatio"].astype(float)
-        print(self.market_data)
-        return self.market_data.nsmallest(n=50, columns="peRatio", keep="first")[["companyName", "latestPrice", "latestTime", "latestSource"]]
-        #wtf, -1556444031219243500 for Groupon???
 
     def nasdaq_dozen(self):
         pass
