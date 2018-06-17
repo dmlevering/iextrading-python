@@ -56,9 +56,10 @@ class DataManager(object):
             )
             #this JSON object will make a fine addition to my collection
             response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
+            #strange syntax for concatenating two dictionaries
             json_collection = {**json_collection, **response_json}
 
-        #parse the data in separate processes (python's threading is... fake)
+        #parallelize the parsing through separate processes (python's threading is... fake)
         processes = []
         lock = Lock()
         for manager in self.managers:
@@ -69,9 +70,6 @@ class DataManager(object):
         #wait for all processes to complete before proceeding
         for process in processes:
             process.join()
-            #for symbol, data in response_json.items():
-                #self.earnings_manager.add_symbol(symbol, data)
-        #self.earnings_manager.create_df()
 
     def splits(self, l, n):
         #yield successive n-sized splits from list l
