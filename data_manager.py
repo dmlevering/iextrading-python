@@ -1,5 +1,6 @@
 from json_parser import JsonParser
 from multiprocessing import Process
+from multiprocessing.pool import ThreadPool
 from cache import Cache
 import csv
 import requests
@@ -28,6 +29,7 @@ class DataManager(object):
 
     BATCH_LIMIT_IEX = 100
     API_URL_IEX     = "https://api.iextrading.com/1.0"
+    THREAD_COUNT    = 15
 
     def __init__(self):
         self.cache = Cache()
@@ -35,11 +37,11 @@ class DataManager(object):
         self.json_data = None
 
         #datastores
-        self.earnings_data = EarningsData()
-        self.quote_data = QuoteData()
-        self.financials_data = FinancialsData()
-        self.stats_data = StatsData()
-        self.company_data = CompanyData()
+        self.earnings_data   = DataStore("earnings",   JsonParser.parse_hier)
+        self.quote_data      = DataStore("quote",      JsonParser.parse_flat)
+        self.financials_data = DataStore("financials", JsonParser.parse_hier)
+        self.stats_data      = DataStore("stats",      JsonParser.parse_flat)
+        self.company_data    = DataStore("company",    JsonParser.parse_flat)
 
         self.datastores = [
             self.earnings_data,
@@ -66,30 +68,21 @@ class DataManager(object):
                 symbols.add(row[0])
         return sorted(list(symbols))
 
-    def _api_request(self, datatypes):
-        pass
-
     def data_refresh(self):
-        datatypes = ",".join([d.get_datatype().get_name() for d in self.datastores])
-        symbol_batches = list(self.splits(self.symbols, self.BATCH_LIMIT_IEX))
-        request_base = "/stock/market/batch?"
-        print("Requesting market data through API...")
+        symbol_batches = list(self._splits(self.symbols, self.BATCH_LIMIT_IEX))
+        print("Requesting market data through IEX Trading API...")
+
+        #parallelize API requests with a thread pool
+        thread_pool = ThreadPool(self.THREAD_COUNT)
+        json_list = thread_pool.map(self._api_request, symbol_batches)
         json_collection = {}
-        for batch in symbol_batches:
-            #set up the parameters for API request
-            params = dict(
-                symbols = ",".join(batch),
-                types = datatypes
-            )
-            #this JSON object will make a fine addition to my collection
-            response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
-            #strange syntax for concatenating two dictionaries (probably slow)
-            json_collection = {**json_collection, **response_json}
+        for json_dict in json_list:
+            json_collection.update(json_dict)
         self.json_data = json_collection
 
-        #parallelize by parsing each datatype in a separate process.
-        #Use processes instead of threads because python's threads do not take
-        #advantage of multiple cores.
+        #parallelize parsing with a process for each data type
+        #use processes instead of threads because python's threads don't take
+        #advantage of multiple cores (they're meant for IO-bound functions)
         processes = []
         for datastore in self.datastores:
             process = Process(target=datastore.refresh,
@@ -104,16 +97,29 @@ class DataManager(object):
             process.join()
             print("Finished parsing " + process.name)
 
-    def splits(self, l, n):
+    def _api_request(self, batch):
+        request_base = "/stock/market/batch?"
+        datatypes = ",".join([d.get_name() for d in self.datastores])
+        #set up the parameters for API request
+        params = dict(
+            symbols = ",".join(batch),
+            types = datatypes
+        )
+        #this JSON object will make a fine addition to my collection
+        response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
+        return response_json
+
+    def _splits(self, l, n):
         #yield successive n-sized splits from list l
         for i in range(0, len(l), n):
             yield l[i:i + n]
 
-class CompanyData(object):
-    def __init__(self):
+class DataStore(object):
+    def __init__(self, name, parser):
         self.df = None
-        self.name = "company"
+        self.name = name
         self.datatype = DataType(self.name, self.name + ".csv")
+        self.parser = parser
 
     def get_name(self):
         return self.name
@@ -125,81 +131,5 @@ class CompanyData(object):
         return self.datatype
 
     def refresh(self, json_data, cache):
-        self.df = JsonParser.parse_flat(json_data, self.datatype.get_name())
-        cache.write(self.datatype, self.df)
-
-class QuoteData(object):
-    def __init__(self):
-        self.df = None
-        self.name = "quote"
-        self.datatype = DataType(self.name, self.name + ".csv")
-
-    def get_name(self):
-        return self.name
-
-    def get_df(self):
-        return self.df
-
-    def get_datatype(self):
-        return self.datatype
-
-    def refresh(self, json_data, cache):
-        self.df = JsonParser.parse_flat(json_data, self.datatype.get_name())
-        cache.write(self.datatype, self.df)
-
-class StatsData(object):
-    def __init__(self):
-        self.df = None
-        self.name = "stats"
-        self.datatype = DataType(self.name, self.name + ".csv")
-
-    def get_name(self):
-        return self.name
-
-    def get_df(self):
-        return self.df
-
-    def get_datatype(self):
-        return self.datatype
-
-    def refresh(self, json_data, cache):
-        self.df = JsonParser.parse_flat(json_data, self.datatype.get_name())
-        cache.write(self.datatype, self.df)
-
-class EarningsData(object):
-    def __init__(self):
-        self.df = None
-        self.name = "earnings"
-        self.datatype = DataType(self.name, self.name + ".csv")
-
-    def get_name(self):
-        return self.name
-
-    def get_df(self):
-        return self.df
-
-    def get_datatype(self):
-        return self.datatype
-
-    def refresh(self, json_data, cache):
-        self.df = JsonParser.parse_hier(json_data, self.datatype.get_name())
-        cache.write(self.datatype, self.df)
-
-class FinancialsData(object):
-    def __init__(self):
-        self.df = None
-        self.name = "financials"
-        self.datatype = DataType(self.name, self.name + ".csv")
-
-    def get_name(self):
-        return self.name
-
-    def get_df(self):
-        return self.df
-
-    def get_datatype(self):
-        return self.datatype
-
-    def refresh(self, json_data, cache):
-        self.df = JsonParser.parse_hier(json_data, self.datatype.get_name())
+        self.df = self.parser(json_data, self.datatype.get_name())
         cache.write(self.datatype, self.df)
