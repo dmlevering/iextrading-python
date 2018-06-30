@@ -3,8 +3,7 @@ from alphavantage import AlphaVantage
 from pprint import pprint
 import requests
 import csv
-from cache.cache import Cache
-from data.data_manager import DataManager
+from data_manager import DataManager
 
 AV_API_KEY = "7NMFQZSBM2Y5BJV6"
 

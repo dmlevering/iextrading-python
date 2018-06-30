@@ -1,18 +1,15 @@
 import pickle
-from data.datatype import DataType
 from datetime import datetime, timedelta
+from multiprocessing import Lock
 
 class Cache(object):
     MAX_DATA_AGE = 120
     PATH_CACHE = "cache/"
     FILENAME_METADATA = "meta.data"
 
-    def __init__(self, lock):
-        self.lock = lock
+    def __init__(self):
+        self.lock = Lock()
         self.meta_path = self.PATH_CACHE + self.FILENAME_METADATA
-
-    def add_manager(self, manager):
-        pass
 
     def write(self, datatype, df):
         self.lock.acquire()

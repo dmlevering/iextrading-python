@@ -9,8 +9,8 @@ import sys
 import csv
 from bs4 import BeautifulSoup
 from pandas.io.json import json_normalize
-from cache.cache import Cache
-from data.data_manager import DataManager
+from cache import Cache
+from data_manager import DataManager
 
 class IEXTrading(object):
     #constants
