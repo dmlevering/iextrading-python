@@ -53,10 +53,9 @@ class TimeSeries(object):
         for json_response in json_list:
             json_data.update(json_response)
 
-        pprint(json_data)
-
         df = JsonParser.parse_hier2(json_data, "chart")
         self.cache.write(self.datatype, df)
+        return df
 
     def _api_request_time_series(self, batch, range):
         request_base = "/stock/market/batch?"
