@@ -42,6 +42,18 @@ class JsonParser(object):
                                ],
                 },
     }
+
+    json_data's structure for list requests:
+    [
+      {
+        key : value,
+        key : value,
+      },
+      {
+        key : value,
+        key : value,
+      },
+    ]
     """
 
     def parse_flat(json_data, datatype_name):
@@ -91,3 +103,12 @@ class JsonParser(object):
             intermediate_list.append(df)
             #print(df)
         return pd.concat(intermediate_list, sort=True)
+
+    def parse_list(json_data):
+        intermediate_list = []
+        for stock in json_data:
+            series = pd.Series(stock)
+            intermediate_list.append(series)
+        df = pd.concat(intermediate_list, axis=1, sort=True).transpose()
+        df.set_index("symbol", inplace=True)
+        return df

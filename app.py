@@ -18,6 +18,9 @@ def index():
     #market.data_refresh()
     df = ts.get_time_series(["GOOG", "AMZN"], "2y") #"MSFT", "AMD", "NVDA"
     plots_json = Plot.plot_time_series(df)
+    market.get_most_active()
+    market.get_gainers()
+    market.get_losers()
 
     # Render the Template
     return render_template("index.html", plot_json=plots_json)

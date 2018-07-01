@@ -73,6 +73,39 @@ class Market(object):
             process.join()
             print("Finished parsing " + process.name)
 
+    def get_most_active(self):
+        request_base = "/stock/market/list/mostactive"
+        #this response will make a fine addition to my collection
+        response_json = requests.get(url=self.API_URL_IEX + request_base).json()
+        if len(response_json) == 0:
+            return None
+        df = JsonParser.parse_list(response_json)
+        print(df)
+        return df
+
+    def get_gainers(self):
+        request_base = "/stock/market/list/gainers"
+        #this response will make a fine addition to my collection
+        response_json = requests.get(url=self.API_URL_IEX + request_base).json()
+        if len(response_json) == 0:
+            return None
+        df = JsonParser.parse_list(response_json)
+        print(df)
+        return df
+
+    def get_losers(self):
+        request_base = "/stock/market/list/losers"
+        #this response will make a fine addition to my collection
+        response_json = requests.get(url=self.API_URL_IEX + request_base).json()
+        if len(response_json) == 0:
+            return None
+        df = JsonParser.parse_list(response_json)
+        print(df)
+        return df
+
+    def get_profile(self, symbol):
+        pass
+
     def _api_request(self, batch):
         request_base = "/stock/market/batch?"
         datatypes = ",".join([d.get_name() for d in self.datastores])
