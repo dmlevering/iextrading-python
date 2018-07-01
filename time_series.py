@@ -3,6 +3,7 @@ from datatype import DataType
 from multiprocessing.dummy import Pool
 from pprint import pprint
 import requests
+import pandas as pd
 
 class TimeSeries(object):
     """
@@ -54,6 +55,8 @@ class TimeSeries(object):
             json_data.update(json_response)
 
         df = JsonParser.parse_hier2(json_data, "chart")
+        df.reset_index(level=1, drop=True, inplace=True)
+        df["date"] = pd.to_datetime(df["date"])
         self.cache.write(self.datatype, df)
         return df
 

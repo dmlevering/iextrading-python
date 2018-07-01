@@ -25,7 +25,7 @@ class Profit(object):
         #df2 = df.loc["GOOG", :]
         graph["date"] = pd.to_datetime(graph["date"])
         #df2.set_index("date", inplace=True)
-        Plot.plot(graph, "Stock Price Over Time")
+        Plot.plot(graph, "Stock Price Over Time", "X", "Y", "seaborn")
 
         #self.av = AlphaVantage(AV_API_KEY)
         #self.iex = IEXTrading()

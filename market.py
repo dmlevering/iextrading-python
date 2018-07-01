@@ -111,7 +111,7 @@ class Market(object):
 
 class DataStore(object):
     """
-    Stores a Pandas DataFrame and the relevant parsing function for this
+    Stores a pandas DataFrame and the relevant parsing function for this
     datatype
     """
     def __init__(self, name, parser):

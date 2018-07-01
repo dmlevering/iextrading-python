@@ -6,58 +6,21 @@ from time_series import TimeSeries
 from cache import Cache
 from plot import Plot
 
-import json
-import plotly
-
-import pandas as pd
-import numpy as np
-import plotly.graph_objs as go
-
 app = Flask(__name__)
 app.debug = True
-
+app._static_folder = ""
 
 @app.route('/')
 def index():
     cache = Cache()
     market = Market(cache)
-    time_series = TimeSeries(cache)
-    #self.market.data_refresh()
-    df = time_series.get_time_series(["GOOG", "AMZN"], "ytd") #"MSFT", "AMD", "NVDA"
-    graph = df[["date", "close"]]
-    graph = graph.reset_index(level=1, drop=True)
-    #graph = graph.unstack()
-    print(graph)
-    #df2 = df.loc["GOOG", :]
-    graph["date"] = pd.to_datetime(graph["date"])
-    #df2.set_index("date", inplace=True)
-    #Plot.plot(graph, "Stock Price Over Time")
-
-    labels, plots = [], []
-    for label, group in graph.groupby(graph.index):
-        labels.append(label)
-        scatter = go.Scatter(x=group["date"], y=group["close"], name=label, mode="lines")
-        plots.append(scatter)
-
-    # Create the Plotly Data Structure
-    graph2 = dict(
-        data= plots,
-        layout=dict(
-            title='Bar Plot',
-            yaxis=dict(
-                title="Count"
-            ),
-            xaxis=dict(
-                title="Fruit"
-            )
-        )
-    )
-
-    # Convert the figures to JSON
-    graphJSON = json.dumps(graph2, cls=plotly.utils.PlotlyJSONEncoder)
+    ts = TimeSeries(cache)
+    #market.data_refresh()
+    df = ts.get_time_series(["GOOG", "AMZN"], "2y") #"MSFT", "AMD", "NVDA"
+    plots_json = Plot.plot_time_series(df)
 
     # Render the Template
-    return render_template('layouts/index.html', graphJSON=graphJSON)
+    return render_template("index.html", plot_json=plots_json)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=9999)
+    app.run(host='127.0.0.1', port=5000)
