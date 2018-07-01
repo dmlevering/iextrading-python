@@ -3,14 +3,19 @@ from alphavantage import AlphaVantage
 from pprint import pprint
 import requests
 import csv
-from data_manager import DataManager
+from market import Market
+from time_series import TimeSeries
+from cache import Cache
 
 AV_API_KEY = "7NMFQZSBM2Y5BJV6"
 
 class Profit(object):
     def __init__(self):
-        self.data_manager = DataManager()
-        self.data_manager.data_refresh()
+        self.cache = Cache()
+        self.market = Market(self.cache)
+        self.time_series = TimeSeries(self.cache)
+        #self.market.data_refresh()
+        self.time_series.get_time_series(["GOOG", "AMZN"], "ytd")
 
         #self.av = AlphaVantage(AV_API_KEY)
         #self.iex = IEXTrading()

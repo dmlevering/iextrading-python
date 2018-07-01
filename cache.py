@@ -78,7 +78,6 @@ class Cache(object):
 
 #this class should never be accessed without holding the Cache lock
 class Meta(object):
-
     def __init__(self):
         self.datetime_earnings = None
         self.datetime_quote = None

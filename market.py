@@ -1,26 +1,15 @@
 from json_parser import JsonParser
+from datatype import DataType
 from multiprocessing import Process
 from multiprocessing.pool import ThreadPool
-from cache import Cache
 import csv
 import requests
 from pprint import pprint
 
-class DataType(object):
+class Market(object):
     """
-    IEX Trading API data type
+    This class handles gathering general market data from the IEX Trading API v1.0
     """
-    def __init__(self, name, filename):
-        self.name = name
-        self.filename = filename
-
-    def get_filename(self):
-        return self.filename
-
-    def get_name(self):
-        return self.name
-
-class DataManager(object):
     #constants
     PATH_SYMBOLS    = "symbols/"
     FILENAME_NASDAQ = "nasdaq.csv"
@@ -29,19 +18,19 @@ class DataManager(object):
 
     BATCH_LIMIT_IEX = 100
     API_URL_IEX     = "https://api.iextrading.com/1.0"
-    THREAD_COUNT    = 15
+    THREAD_COUNT    = 30
 
-    def __init__(self):
-        self.cache = Cache()
+    def __init__(self, cache):
+        self.cache = cache
         self.symbols = self._read_symbols()
         self.json_data = None
 
         #datastores
-        self.earnings_data   = DataStore("earnings",   JsonParser.parse_hier)
-        self.quote_data      = DataStore("quote",      JsonParser.parse_flat)
-        self.financials_data = DataStore("financials", JsonParser.parse_hier)
-        self.stats_data      = DataStore("stats",      JsonParser.parse_flat)
-        self.company_data    = DataStore("company",    JsonParser.parse_flat)
+        self.earnings_data   = DataStore("earnings",   JsonParser.parse_hier1)
+        self.quote_data      = DataStore("quote",      JsonParser.parse_flat )
+        self.financials_data = DataStore("financials", JsonParser.parse_hier1)
+        self.stats_data      = DataStore("stats",      JsonParser.parse_flat )
+        self.company_data    = DataStore("company",    JsonParser.parse_flat )
 
         self.datastores = [
             self.earnings_data,
@@ -51,38 +40,25 @@ class DataManager(object):
             self.company_data,
         ]
 
-    def _read_symbols(self):
-        #read a list of symbols (tickers)
-        symbols = set()
-        with open(self.PATH_SYMBOLS + self.FILENAME_NASDAQ, "r") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        with open(self.PATH_SYMBOLS + self.FILENAME_NYSE, "r") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        with open(self.PATH_SYMBOLS + self.FILENAME_AMEX, "r") as f:
-            reader = csv.reader(f, delimiter=',')
-            for row in reader:
-                symbols.add(row[0])
-        return sorted(list(symbols))
-
     def data_refresh(self):
         symbol_batches = list(self._splits(self.symbols, self.BATCH_LIMIT_IEX))
         print("Requesting market data through IEX Trading API...")
 
-        #parallelize API requests with a thread pool
-        thread_pool = ThreadPool(self.THREAD_COUNT)
-        json_list = thread_pool.map(self._api_request, symbol_batches)
-        json_collection = {}
-        for json_dict in json_list:
-            json_collection.update(json_dict)
-        self.json_data = json_collection
+        #parallelize API requests with a thread pool. Python threads are a reasonable
+        #choice here because the bottleneck is network latency, not processing power.
+        pool = ThreadPool(self.THREAD_COUNT)
+        json_list = pool.map(self._api_request, symbol_batches)
+        pool.close()
+        pool.join()
 
-        #parallelize parsing with a process for each data type
-        #use processes instead of threads because python's threads don't take
-        #advantage of multiple cores (they're meant for IO-bound functions)
+        #combine json responses
+        self.json_data = {}
+        for json_response in json_list:
+            self.json_data.update(json_response)
+
+        #parallelize parsing with a process for each data type.
+        #Use processes instead of threads because python's threads don't take
+        #advantage of multiple cores.
         processes = []
         for datastore in self.datastores:
             process = Process(target=datastore.refresh,
@@ -105,9 +81,28 @@ class DataManager(object):
             symbols = ",".join(batch),
             types = datatypes
         )
-        #this JSON object will make a fine addition to my collection
+        #this response will make a fine addition to my collection
         response_json = requests.get(url=self.API_URL_IEX + request_base, params=params).json()
         return response_json
+
+    def _read_symbols(self):
+        """
+        Read a list of symbols (tickers) into memory
+        """
+        symbols = set()
+        with open(self.PATH_SYMBOLS + self.FILENAME_NASDAQ, "r") as f:
+            reader = csv.reader(f, delimiter=',')
+            for row in reader:
+                symbols.add(row[0])
+        with open(self.PATH_SYMBOLS + self.FILENAME_NYSE, "r") as f:
+            reader = csv.reader(f, delimiter=',')
+            for row in reader:
+                symbols.add(row[0])
+        with open(self.PATH_SYMBOLS + self.FILENAME_AMEX, "r") as f:
+            reader = csv.reader(f, delimiter=',')
+            for row in reader:
+                symbols.add(row[0])
+        return sorted(list(symbols))
 
     def _splits(self, l, n):
         #yield successive n-sized splits from list l
@@ -115,6 +110,10 @@ class DataManager(object):
             yield l[i:i + n]
 
 class DataStore(object):
+    """
+    Stores a Pandas DataFrame and the relevant parsing function for this
+    datatype
+    """
     def __init__(self, name, parser):
         self.df = None
         self.name = name
