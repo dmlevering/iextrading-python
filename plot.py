@@ -4,7 +4,7 @@ import seaborn as sns
 class Plot(object):
 
     #constants
-    STYLE_DARK = {
+    SEABORN_STYLE_DARK = {
         "axes.axisbelow": True,
         "axes.edgecolor": "white",
         "axes.facecolor": "#020811",
@@ -42,9 +42,10 @@ class Plot(object):
         #plt.rcParams.update(plt.rcParamsDefault)
         #plt.style.use("seaborn-paper")
         #sns.set()
-        sns.set_style("dark", rc=Plot.STYLE_DARK)
+        sns.set_style("dark", rc=Plot.SEABORN_STYLE_DARK)
         fig, ax = plt.subplots(figsize=(8,6))
         for label, group in df.groupby(df.index):
+            print(label)
             group.plot(x="date", y="close", ax=ax, label=label)
         plt.legend()
         sns.despine()
