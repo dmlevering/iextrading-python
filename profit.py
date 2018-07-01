@@ -14,7 +14,7 @@ class Profit(object):
         self.cache = Cache()
         self.market = Market(self.cache)
         self.time_series = TimeSeries(self.cache)
-        #self.market.data_refresh()
+        self.market.data_refresh()
         self.time_series.get_time_series(["GOOG", "AMZN"], "ytd")
 
         #self.av = AlphaVantage(AV_API_KEY)

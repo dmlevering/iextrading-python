@@ -1,7 +1,7 @@
 from json_parser import JsonParser
 from datatype import DataType
 from multiprocessing import Process
-from multiprocessing.pool import ThreadPool
+from multiprocessing.dummy import Pool
 import csv
 import requests
 from pprint import pprint
@@ -46,7 +46,7 @@ class Market(object):
 
         #parallelize API requests with a thread pool. Python threads are a reasonable
         #choice here because the bottleneck is network latency, not processing power.
-        pool = ThreadPool(self.THREAD_COUNT)
+        pool = Pool(self.THREAD_COUNT)
         json_list = pool.map(self._api_request, symbol_batches)
         pool.close()
         pool.join()
@@ -57,7 +57,7 @@ class Market(object):
             self.json_data.update(json_response)
 
         #parallelize parsing with a process for each data type.
-        #Use processes instead of threads because python's threads don't take
+        #Use processes instead of threads because python's threads often don't take
         #advantage of multiple cores.
         processes = []
         for datastore in self.datastores:

@@ -1,6 +1,6 @@
 from json_parser import JsonParser
 from datatype import DataType
-from multiprocessing.pool import ThreadPool
+from multiprocessing.dummy import Pool
 from pprint import pprint
 import requests
 
@@ -42,7 +42,7 @@ class TimeSeries(object):
         print("Requesting time series data through IEX Trading API...")
 
         #parallelize API requests with a thread pool
-        pool = ThreadPool(self.THREAD_COUNT)
+        pool = Pool(self.THREAD_COUNT)
         json_list = pool.starmap(self._api_request_time_series,
                                  zip(symbol_batches, [range] * len(symbol_batches)))
         pool.close()
