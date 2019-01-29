@@ -1,5 +1,5 @@
 from json_parser import JsonParser
-from datatype import DataType
+from data import DataType, DataStore
 from multiprocessing import Process
 from multiprocessing.dummy import Pool
 import csv
@@ -20,18 +20,15 @@ class Market(object):
     API_URL_IEX     = "https://api.iextrading.com/1.0"
     THREAD_COUNT    = 30
 
-    def __init__(self, cache):
-        self.cache = cache
+    def __init__(self):
         self.symbols = self._read_symbols()
-        self.json_data = None
 
-        #datastores
+        #initialize datastores
         self.earnings_data   = DataStore("earnings",   JsonParser.parse_hier1)
         self.quote_data      = DataStore("quote",      JsonParser.parse_flat )
         self.financials_data = DataStore("financials", JsonParser.parse_hier1)
         self.stats_data      = DataStore("stats",      JsonParser.parse_flat )
         self.company_data    = DataStore("company",    JsonParser.parse_flat )
-
         self.datastores = [
             self.earnings_data,
             self.quote_data,
@@ -40,9 +37,12 @@ class Market(object):
             self.company_data,
         ]
 
+        #populate data
+        self.data_refresh()
+
     def data_refresh(self):
         symbol_batches = list(self._splits(self.symbols, self.BATCH_LIMIT_IEX))
-        print("Requesting market data through IEX Trading API...")
+        print("Market data refresh...")
 
         #parallelize API requests with a thread pool. Python threads are a reasonable
         #choice here because the bottleneck is network latency, not processing power.
@@ -52,21 +52,21 @@ class Market(object):
         pool.join()
 
         #combine json responses
-        self.json_data = {}
+        json_data = {}
         for json_response in json_list:
-            self.json_data.update(json_response)
+            json_data.update(json_response)
 
         #parallelize parsing with a process for each data type.
         #Use processes instead of threads because python's threads often don't take
         #advantage of multiple cores.
         processes = []
         for datastore in self.datastores:
-            process = Process(target=datastore.refresh,
-                              args=(self.json_data, self.cache),
+            process = Process(target=datastore.parse_and_save,
+                              args=(json_data,),
                               name=datastore.get_name())
             process.start()
             processes.append(process)
-            print("Begin parsing " + process.name)
+            print("Begin parsing '" + process.name + "'")
 
         #wait for all processes to complete before proceeding
         for process in processes:
@@ -141,27 +141,3 @@ class Market(object):
         #yield successive n-sized splits from list l
         for i in range(0, len(l), n):
             yield l[i:i + n]
-
-class DataStore(object):
-    """
-    Stores a pandas DataFrame and the relevant parsing function for this
-    datatype
-    """
-    def __init__(self, name, parser):
-        self.df = None
-        self.name = name
-        self.datatype = DataType(self.name, self.name + ".csv")
-        self.parser = parser
-
-    def get_name(self):
-        return self.name
-
-    def get_df(self):
-        return self.df
-
-    def get_datatype(self):
-        return self.datatype
-
-    def refresh(self, json_data, cache):
-        self.df = self.parser(json_data, self.datatype.get_name())
-        cache.write(self.datatype, self.df)

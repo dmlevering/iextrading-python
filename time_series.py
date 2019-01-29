@@ -1,5 +1,5 @@
 from json_parser import JsonParser
-from datatype import DataType
+from data import DataType
 from multiprocessing.dummy import Pool
 from pprint import pprint
 import requests
@@ -30,15 +30,15 @@ class TimeSeries(object):
                    #data is only returned during market hours.
     ]
 
-    def __init__(self, cache):
-        self.cache = cache
-        self.datatype = DataType("chart", "chart.csv")
+    def __init__(self):
+        self.datatype = DataType("chart")
 
     def get_time_series(self, symbols, range):
         if range not in self.VALID_RANGES:
             print("Error - invalid range: " + range)
             return None
 
+        #split list of symbols into batches for API requests
         symbol_batches = list(self._splits(symbols, self.BATCH_LIMIT_IEX))
         print("Requesting time series data through IEX Trading API...")
 
@@ -57,7 +57,6 @@ class TimeSeries(object):
         df = JsonParser.parse_hier2(json_data, "chart")
         df.reset_index(level=1, drop=True, inplace=True)
         df["date"] = pd.to_datetime(df["date"])
-        self.cache.write(self.datatype, df)
         return df
 
     def _api_request_time_series(self, batch, range):

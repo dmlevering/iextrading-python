@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import plotly
 import plotly.graph_objs as go
+from pprint import pprint
 
 class Plot(object):
 
@@ -46,21 +47,19 @@ class Plot(object):
             scatter = go.Scatter(x=group[x], y=group[y], name=label, mode="lines")
             plots.append(scatter)
 
-        #create plotly JSON
-        plotly_struct = dict(
-            data = plots,
-            layout = dict(
-                title = "Time Series",
-                xaxis = dict(
-                    title = "Date"
-                ),
-                yaxis = dict(
-                    title = "Close Price ($)"
-                )
-            )
-        )
-        plots_json = json.dumps(plotly_struct, cls=plotly.utils.PlotlyJSONEncoder)
-        return plots_json
+        return Plot.get_plotly_json(plots, title, xlabel, ylabel)
+
+    def plot_marketcaps_over_time(df, market, title="Market Caps Over Time", xlabel="Date",
+                                  ylabel="Share Price ($) * Shares Outstanding", x="date", y="close"):
+        #create plots
+        plots = []
+        for label, group in df.groupby(df.index):
+            shares_outstanding = market.stats_data.df.loc[market.stats_data.df['symbol'] == label]["sharesOutstanding"]
+            scatter = go.Scatter(x=group[x], y=group[y] * int(shares_outstanding),
+                                 name=label, mode="lines")
+            plots.append(scatter)
+
+        return Plot.get_plotly_json(plots, title, xlabel, ylabel)
 
     @staticmethod
     def plot(df, title, xlabel, ylabel, engine):
@@ -77,3 +76,21 @@ class Plot(object):
             plt.show()
         elif engine == "plotly":
             pass
+
+    @staticmethod
+    def get_plotly_json(plots, title, xlabel, ylabel):
+        #create plotly JSON
+        plotly_struct = dict(
+            data = plots,
+            layout = dict(
+                title = title,
+                xaxis = dict(
+                    title = xlabel
+                ),
+                yaxis = dict(
+                    title = ylabel
+                )
+            )
+        )
+        plots_json = json.dumps(plotly_struct, cls=plotly.utils.PlotlyJSONEncoder)
+        return plots_json
